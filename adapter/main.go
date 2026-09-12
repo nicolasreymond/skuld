@@ -87,10 +87,17 @@ func main() {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(v)
 	}
+	// READ_API_KEY protège les endpoints de lecture pour une exposition publique
+	// (ex. via un reverse proxy). Vide = accès ouvert (mode privé/tailnet).
+	readKey := os.Getenv("READ_API_KEY")
 	onlyGet := func(h http.HandlerFunc) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
 			if r.Method != http.MethodGet {
 				writeErr(w, 405, "method not allowed")
+				return
+			}
+			if readKey != "" && r.Header.Get("Authorization") != "Bearer "+readKey {
+				writeErr(w, 401, "unauthorized")
 				return
 			}
 			h(w, r)

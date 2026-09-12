@@ -65,8 +65,11 @@ Avec Tailscale actif sur le tél, l'API est joignable **de partout** (4G, autre 
 ## Sécurité
 
 - `gaps.env` contient tes **identifiants GAPS** et le **token ntfy** : jamais commité (gitignoré).
-- Les endpoints `GET` **ne sont pas authentifiés** : ne les expose **que** sur ton tailnet privé,
-  pas en clair sur Internet. (Une exposition publique demanderait d'ajouter un token.)
+- Par défaut, les endpoints `GET` **ne sont pas authentifiés** : ne les expose **que** sur ton
+  tailnet privé. **Pour un accès public** (app utilisable sans Tailscale), mets un `READ_API_KEY`
+  dans `gaps.env` et place l'API derrière un reverse proxy HTTPS : les lectures exigeront alors
+  `Authorization: Bearer <READ_API_KEY>` (l'app l'envoie via `SKULD_TOKEN`). Sans ce token, l'API
+  publique renvoie 401.
 - Choisis un **topic ntfy** difficile à deviner (quiconque le connaît reçoit tes notifs).
 
 ## Licence
