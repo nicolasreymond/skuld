@@ -36,6 +36,10 @@ curl http://127.0.0.1:8088/healthz     # → ok
 
 Le scraper remplit `data/history/grades.json` à sa première exécution ; l'API est alors complète.
 
+**Amis (optionnel)** : dépose les fichiers ICS de tes amis dans `data/friends/` (un `.ics` par
+personne, ex. `Horaire_Nom_Prenom_S1_2026_2027.ics`) → l'endpoint `/friends` indique où en est
+chacun. Ces ICS sont **gitignorés** (données perso).
+
 ## API
 
 Toutes en `GET` (sauf `/api/grade`), servies sur le port **8088** :
@@ -49,6 +53,7 @@ Toutes en `GET` (sauf `/api/grade`), servies sur le port **8088** :
 | `/schedule` | cours à venir |
 | `/grades` | toutes les notes |
 | `/target?course=X&goal=G[&weight=W]` | note à obtenir sur la prochaine épreuve pour atteindre la moyenne visée |
+| `/friends` | cours en cours + prochain cours de chaque ami (ICS déposés dans `data/friends/`) |
 | `/api/grade` | `POST` interne du scraper (auth `ADAPTER_API_KEY`) → notif ntfy |
 
 En plus, un **rappel ntfy « cours dans N min »** est envoyé avant chaque cours

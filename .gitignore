@@ -6,3 +6,4 @@ data/history/*
 !data/history/.gitkeep
 # Binaire compilé de l'adaptateur
 adapter/adapter
+data/friends/*.ics

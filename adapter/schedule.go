@@ -2,6 +2,7 @@ package main
 
 import (
 	"os"
+	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
@@ -76,6 +77,68 @@ func nextClass(icsPath string, now time.Time) (*Lesson, error) {
 		}
 	}
 	return best, nil
+}
+
+// currentAndNext : le cours en cours (couvrant now) et le prochain, sur un ICS.
+func currentAndNext(icsPath string, now time.Time) (current, next *Lesson, err error) {
+	b, err := os.ReadFile(icsPath)
+	if err != nil {
+		return nil, nil, err
+	}
+	loc, err := time.LoadLocation("Europe/Zurich")
+	if err != nil {
+		return nil, nil, err
+	}
+	events := parseICS(unfold(string(b)), loc)
+	for _, ev := range events {
+		if occ := ev.occurrenceCovering(now); occ != nil {
+			if current == nil || occ.Start.Before(current.Start) {
+				current = occ
+			}
+		}
+		if occ := ev.nextOccurrence(now); occ != nil {
+			if next == nil || occ.Start.Before(next.Start) {
+				next = occ
+			}
+		}
+	}
+	return current, next, nil
+}
+
+// occurrenceCovering : l'occurrence hebdo en cours à now (start ≤ now < end), ou nil.
+func (ev vevent) occurrenceCovering(now time.Time) *Lesson {
+	s := ev.start
+	for !s.Add(ev.dur).After(now) { // avance tant que la fin ≤ now
+		s = s.AddDate(0, 0, 7)
+	}
+	if !ev.until.IsZero() && s.After(ev.until) {
+		return nil
+	}
+	if s.After(now) { // pas encore commencé
+		return nil
+	}
+	if ev.exdates[s.Format("20060102T150405")] {
+		return nil
+	}
+	return &Lesson{Summary: ev.summary, Location: ev.location, Start: s, End: s.Add(ev.dur)}
+}
+
+// friendName : « Horaire_Perret_Jonatan_S1_2026_2027.ics » → « Jonatan Perret ».
+func friendName(file string) string {
+	base := strings.TrimSuffix(filepath.Base(file), ".ics")
+	base = strings.TrimPrefix(base, "Horaire_")
+	semTok := regexp.MustCompile(`^S\d`)
+	var toks []string
+	for _, t := range strings.Split(base, "_") {
+		if semTok.MatchString(t) {
+			break
+		}
+		toks = append(toks, t)
+	}
+	if len(toks) == 2 {
+		return toks[1] + " " + toks[0] // Prénom Nom
+	}
+	return strings.Join(toks, " ")
 }
 
 // nextOccurrence : la prochaine occurrence hebdo ≥ now (hors EXDATE, ≤ until).

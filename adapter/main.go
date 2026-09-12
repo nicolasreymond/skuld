@@ -10,6 +10,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -31,6 +32,7 @@ func main() {
 	addr := envOr("LISTEN", ":8080")
 	gradesFile := envOr("GRADES_FILE", "/history/grades.json")
 	icsFile := envOr("ICS_FILE", "/data/horaire.ics")
+	friendsDir := envOr("FRIENDS_DIR", "/data/friends")
 
 	http.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) { io.WriteString(w, "ok") })
 
@@ -228,6 +230,32 @@ func main() {
 			"achievable":     needed <= 6.0,   // barème /6
 			"already":        current >= goal, // objectif déjà atteint
 		})
+	}))
+
+	// /friends : statut de chaque ami (cours en cours + prochain cours), depuis les
+	// ICS déposés dans FRIENDS_DIR.
+	http.HandleFunc("/friends", onlyGet(func(w http.ResponseWriter, _ *http.Request) {
+		entries, _ := os.ReadDir(friendsDir)
+		now := time.Now()
+		type friendStatus struct {
+			Name    string  `json:"name"`
+			InClass bool    `json:"in_class"`
+			Current *Lesson `json:"current"`
+			Next    *Lesson `json:"next"`
+		}
+		out := make([]friendStatus, 0, len(entries))
+		for _, e := range entries {
+			if e.IsDir() || !strings.HasSuffix(e.Name(), ".ics") {
+				continue
+			}
+			cur, nxt, err := currentAndNext(filepath.Join(friendsDir, e.Name()), now)
+			if err != nil {
+				continue
+			}
+			out = append(out, friendStatus{Name: friendName(e.Name()), InClass: cur != nil, Current: cur, Next: nxt})
+		}
+		sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
+		writeJSON(w, map[string]any{"friends": out})
 	}))
 
 	// Rappel « cours dans N min » (0 = désactivé).

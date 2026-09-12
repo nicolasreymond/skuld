@@ -9,6 +9,7 @@ services:
     volumes:
       - ./data/history:/history:ro          # grades.json (écrit par le scraper)
       - ./data/horaire.ics:/data/horaire.ics:ro  # ton emploi du temps exporté de GAPS
+      - ./data/friends:/data/friends:ro     # (optionnel) ICS d'amis pour /friends
     ports:
       # Par défaut : localhost uniquement. Pour joindre l'API depuis ton téléphone
       # via Tailscale, mets ton IP Tailscale dans .env : SKULD_BIND=100.x.y.z
