@@ -1,0 +1,26 @@
+services:
+  # Adaptateur : sert l'API lue par l'app (widget/averages/semester/…) et republie
+  # les nouvelles notes du scraper en notification ntfy.
+  skuld-adapter:
+    build: ./adapter
+    container_name: skuld-adapter
+    restart: unless-stopped
+    env_file: gaps.env
+    volumes:
+      - ./data/history:/history:ro          # grades.json (écrit par le scraper)
+      - ./data/horaire.ics:/data/horaire.ics:ro  # ton emploi du temps exporté de GAPS
+    ports:
+      # Par défaut : localhost uniquement. Pour joindre l'API depuis ton téléphone
+      # via Tailscale, mets ton IP Tailscale dans .env : SKULD_BIND=100.x.y.z
+      - "${SKULD_BIND:-127.0.0.1}:8088:8080"
+
+  # Scraper gaps-cli : surveille GAPS et POST les nouvelles notes à l'adaptateur.
+  skuld-scraper:
+    build: ./scraper
+    container_name: skuld-scraper
+    restart: unless-stopped
+    command: ["scraper", "--interval", "10800"]   # 3 h — discret (évite un ban GAPS)
+    env_file: gaps.env
+    volumes:
+      - ./data/history:/history                    # historique (évite de re-notifier au restart)
+    depends_on: [skuld-adapter]

@@ -1,0 +1,8 @@
+# Secrets & données — jamais partagés
+gaps.env
+.env
+data/horaire.ics
+data/history/*
+!data/history/.gitkeep
+# Binaire compilé de l'adaptateur
+adapter/adapter
