@@ -48,7 +48,11 @@ Toutes en `GET` (sauf `/api/grade`), servies sur le port **8088** :
 | `/next-class` | prochain cours |
 | `/schedule` | cours à venir |
 | `/grades` | toutes les notes |
+| `/target?course=X&goal=G[&weight=W]` | note à obtenir sur la prochaine épreuve pour atteindre la moyenne visée |
 | `/api/grade` | `POST` interne du scraper (auth `ADAPTER_API_KEY`) → notif ntfy |
+
+En plus, un **rappel ntfy « cours dans N min »** est envoyé avant chaque cours
+(désactivable via `REMINDER_MINUTES=0`).
 
 ## Accès depuis le téléphone
 

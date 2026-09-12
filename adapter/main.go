@@ -4,7 +4,6 @@
 package main
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -12,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -54,28 +54,8 @@ func main() {
 		msg := fmt.Sprintf("%s · %s\nMoyenne de classe : %.2f",
 			strings.TrimSpace(g.Class), strings.TrimSpace(g.Name), g.Mean)
 
-		payload, _ := json.Marshal(map[string]any{
-			"topic":    ntfyTopic,
-			"title":    title,
-			"message":  msg,
-			"tags":     []string{"mortar_board"},
-			"priority": 4,
-		})
-		req, _ := http.NewRequest(http.MethodPost, ntfyURL, bytes.NewReader(payload))
-		req.Header.Set("Content-Type", "application/json")
-		if ntfyToken != "" {
-			req.Header.Set("Authorization", "Bearer "+ntfyToken)
-		}
-		res, err := http.DefaultClient.Do(req)
-		if err != nil {
+		if err := publishNtfy(ntfyURL, ntfyTopic, ntfyToken, title, msg, []string{"mortar_board"}, 4); err != nil {
 			log.Printf("ntfy publish error: %v", err)
-			writeErr(w, 502, "ntfy unreachable")
-			return
-		}
-		io.Copy(io.Discard, res.Body)
-		res.Body.Close()
-		if res.StatusCode >= 400 {
-			log.Printf("ntfy returned %d", res.StatusCode)
 			writeErr(w, 502, "ntfy error")
 			return
 		}
@@ -88,7 +68,7 @@ func main() {
 		json.NewEncoder(w).Encode(v)
 	}
 	// READ_API_KEY protège les endpoints de lecture pour une exposition publique
-	// (ex. via un reverse proxy). Vide = accès ouvert (mode privé/tailnet).
+	// (ex. via Cloudflare). Vide = accès ouvert (mode tailnet privé, rétro-compatible).
 	readKey := os.Getenv("READ_API_KEY")
 	onlyGet := func(h http.HandlerFunc) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
@@ -196,6 +176,65 @@ func main() {
 		}
 		writeJSON(w, map[string]any{"semester": sem, "courses": courses})
 	}))
+
+	// /target?course=X&goal=G[&weight=W] : note à obtenir sur une prochaine épreuve
+	// (de poids W, par défaut le poids moyen des épreuves du cours) pour atteindre la
+	// moyenne visée G. Modèle : moyenne pondérée par le poids des notes.
+	http.HandleFunc("/target", onlyGet(func(w http.ResponseWriter, r *http.Request) {
+		course := r.URL.Query().Get("course")
+		goalStr := r.URL.Query().Get("goal")
+		if course == "" || goalStr == "" {
+			writeErr(w, 400, "paramètres 'course' et 'goal' requis")
+			return
+		}
+		goal, err := strconv.ParseFloat(goalStr, 64)
+		if err != nil {
+			writeErr(w, 400, "'goal' invalide")
+			return
+		}
+		g, _ := loadGrades(gradesFile)
+		var sumW, sumWG float64
+		var count int
+		for _, x := range g {
+			if x.Course != course {
+				continue
+			}
+			v, e := strconv.ParseFloat(x.Grade, 64)
+			if e != nil {
+				continue
+			}
+			sumW += x.Weight
+			sumWG += v * x.Weight
+			count++
+		}
+		if sumW == 0 {
+			writeErr(w, 404, "cours inconnu ou sans note")
+			return
+		}
+		current := sumWG / sumW
+		weight := sumW / float64(count) // poids moyen d'une épreuve
+		if ws := r.URL.Query().Get("weight"); ws != "" {
+			if wv, e := strconv.ParseFloat(ws, 64); e == nil && wv > 0 {
+				weight = wv
+			}
+		}
+		needed := (goal*(sumW+weight) - sumWG) / weight
+		writeJSON(w, map[string]any{
+			"course":         course,
+			"current":        current,
+			"goal":           goal,
+			"assumed_weight": weight,
+			"needed":         needed,          // note à obtenir sur la prochaine épreuve
+			"achievable":     needed <= 6.0,   // barème /6
+			"already":        current >= goal, // objectif déjà atteint
+		})
+	}))
+
+	// Rappel « cours dans N min » (0 = désactivé).
+	if mins, err := strconv.Atoi(envOr("REMINDER_MINUTES", "15")); err == nil && mins > 0 {
+		go reminderLoop(icsFile, ntfyURL, ntfyTopic, ntfyToken, time.Duration(mins)*time.Minute)
+		log.Printf("rappel cours activé : %d min avant", mins)
+	}
 
 	log.Printf("gaps→ntfy adapter listening on %s (topic=%s)", addr, ntfyTopic)
 	log.Fatal(http.ListenAndServe(addr, nil))
