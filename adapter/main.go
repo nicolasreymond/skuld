@@ -271,6 +271,7 @@ func main() {
 		entries, _ := os.ReadDir(friendsDir)
 		type friendDay struct {
 			Name    string   `json:"name"`
+			Me      bool     `json:"me"`
 			Lessons []Lesson `json:"lessons"`
 		}
 		out := make([]friendDay, 0, len(entries))
@@ -288,7 +289,14 @@ func main() {
 			out = append(out, friendDay{Name: friendName(e.Name()), Lessons: ls})
 		}
 		sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
-		writeJSON(w, map[string]any{"date": day.Format("2006-01-02"), "friends": out})
+
+		// « Moi » d'abord : l'emploi du temps du propriétaire (icsFile).
+		mine, _ := daySchedule(icsFile, day)
+		if mine == nil {
+			mine = []Lesson{}
+		}
+		all := append([]friendDay{{Name: envOr("ME_NAME", "Moi"), Me: true, Lessons: mine}}, out...)
+		writeJSON(w, map[string]any{"date": day.Format("2006-01-02"), "friends": all})
 	}))
 
 	// Rappel « cours dans N min » (0 = désactivé).
