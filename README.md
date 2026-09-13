@@ -54,6 +54,7 @@ Toutes en `GET` (sauf `/api/grade`), servies sur le port **8088** :
 | `/grades` | toutes les notes |
 | `/target?course=X&goal=G[&weight=W]` | note à obtenir sur la prochaine épreuve pour atteindre la moyenne visée |
 | `/friends` | cours en cours + prochain cours de chaque ami (ICS déposés dans `data/friends/`) |
+| `/friends/day?date=YYYY-MM-DD` | emploi du temps d'un ami pour un jour (défaut : aujourd'hui) |
 | `/api/grade` | `POST` interne du scraper (auth `ADAPTER_API_KEY`) → notif ntfy |
 
 En plus, un **rappel ntfy « cours dans N min »** est envoyé avant chaque cours

@@ -105,6 +105,47 @@ func currentAndNext(icsPath string, now time.Time) (current, next *Lesson, err e
 	return current, next, nil
 }
 
+// daySchedule : tous les cours d'un ICS pour un jour calendaire donné, triés.
+func daySchedule(icsPath string, day time.Time) ([]Lesson, error) {
+	b, err := os.ReadFile(icsPath)
+	if err != nil {
+		return nil, err
+	}
+	loc, err := time.LoadLocation("Europe/Zurich")
+	if err != nil {
+		return nil, err
+	}
+	events := parseICS(unfold(string(b)), loc)
+	var out []Lesson
+	for _, ev := range events {
+		if occ := ev.occurrenceOnDay(day); occ != nil {
+			out = append(out, *occ)
+		}
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Start.Before(out[j].Start) })
+	return out, nil
+}
+
+// occurrenceOnDay : l'occurrence hebdo tombant le jour 'day' (même jour de semaine),
+// dans les bornes (until, EXDATE), ou nil.
+func (ev vevent) occurrenceOnDay(day time.Time) *Lesson {
+	if ev.start.Weekday() != day.Weekday() {
+		return nil
+	}
+	s := time.Date(day.Year(), day.Month(), day.Day(),
+		ev.start.Hour(), ev.start.Minute(), ev.start.Second(), 0, ev.start.Location())
+	if s.Before(ev.start) {
+		return nil // avant la première occurrence
+	}
+	if !ev.until.IsZero() && s.After(ev.until) {
+		return nil
+	}
+	if ev.exdates[s.Format("20060102T150405")] {
+		return nil
+	}
+	return &Lesson{Summary: ev.summary, Location: ev.location, Start: s, End: s.Add(ev.dur)}
+}
+
 // occurrenceCovering : l'occurrence hebdo en cours à now (start ≤ now < end), ou nil.
 func (ev vevent) occurrenceCovering(now time.Time) *Lesson {
 	s := ev.start

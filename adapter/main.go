@@ -258,6 +258,39 @@ func main() {
 		writeJSON(w, map[string]any{"friends": out})
 	}))
 
+	// /friends/day?date=YYYY-MM-DD : emploi du temps de chaque ami pour un jour
+	// (défaut : aujourd'hui). « Ce qu'ils ont dans la journée. »
+	http.HandleFunc("/friends/day", onlyGet(func(w http.ResponseWriter, r *http.Request) {
+		loc, _ := time.LoadLocation("Europe/Zurich")
+		day := time.Now().In(loc)
+		if ds := r.URL.Query().Get("date"); ds != "" {
+			if t, e := time.ParseInLocation("2006-01-02", ds, loc); e == nil {
+				day = t
+			}
+		}
+		entries, _ := os.ReadDir(friendsDir)
+		type friendDay struct {
+			Name    string   `json:"name"`
+			Lessons []Lesson `json:"lessons"`
+		}
+		out := make([]friendDay, 0, len(entries))
+		for _, e := range entries {
+			if e.IsDir() || !strings.HasSuffix(e.Name(), ".ics") {
+				continue
+			}
+			ls, err := daySchedule(filepath.Join(friendsDir, e.Name()), day)
+			if err != nil {
+				continue
+			}
+			if ls == nil {
+				ls = []Lesson{}
+			}
+			out = append(out, friendDay{Name: friendName(e.Name()), Lessons: ls})
+		}
+		sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
+		writeJSON(w, map[string]any{"date": day.Format("2006-01-02"), "friends": out})
+	}))
+
 	// Rappel « cours dans N min » (0 = désactivé).
 	if mins, err := strconv.Atoi(envOr("REMINDER_MINUTES", "15")); err == nil && mins > 0 {
 		go reminderLoop(icsFile, ntfyURL, ntfyTopic, ntfyToken, time.Duration(mins)*time.Minute)
