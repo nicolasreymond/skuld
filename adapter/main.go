@@ -33,6 +33,7 @@ func main() {
 	gradesFile := envOr("GRADES_FILE", "/history/grades.json")
 	icsFile := envOr("ICS_FILE", "/data/horaire.ics")
 	friendsDir := envOr("FRIENDS_DIR", "/data/friends")
+	absencesFile := envOr("ABSENCES_FILE", "/history/absences.json")
 
 	http.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) { io.WriteString(w, "ok") })
 
@@ -297,6 +298,17 @@ func main() {
 		}
 		all := append([]friendDay{{Name: envOr("ME_NAME", "Moi"), Me: true, Lessons: mine}}, out...)
 		writeJSON(w, map[string]any{"date": day.Format("2006-01-02"), "friends": all})
+	}))
+
+	// /absences : relaie absences.json (produit 1×/jour par fetch-extras.sh via gaps-cli).
+	http.HandleFunc("/absences", onlyGet(func(w http.ResponseWriter, _ *http.Request) {
+		b, err := os.ReadFile(absencesFile)
+		if err != nil {
+			writeErr(w, 503, "absences pas encore disponibles")
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(b)
 	}))
 
 	// Rappel « cours dans N min » (0 = désactivé).

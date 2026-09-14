@@ -55,7 +55,11 @@ Toutes en `GET` (sauf `/api/grade`), servies sur le port **8088** :
 | `/target?course=X&goal=G[&weight=W]` | note à obtenir sur la prochaine épreuve pour atteindre la moyenne visée |
 | `/friends` | cours en cours + prochain cours de chaque ami (ICS déposés dans `data/friends/`) |
 | `/friends/day?date=YYYY-MM-DD` | emploi du temps d'un ami pour un jour (défaut : aujourd'hui) |
+| `/absences` | absences par cours (relaie `data/history/absences.json`) |
 | `/api/grade` | `POST` interne du scraper (auth `ADAPTER_API_KEY`) → notif ntfy |
+
+Le script **`fetch-extras.sh`** (à lancer par cron ~1×/jour) récupère **absences** et **bulletin**
+via `gaps-cli` — garde une fréquence basse pour éviter un ban GAPS.
 
 En plus, un **rappel ntfy « cours dans N min »** est envoyé avant chaque cours
 (désactivable via `REMINDER_MINUTES=0`).
